@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Min IMDb Top 250</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg:#f6f7f8; --card:#fff; --text:#171717; --muted:#6b7280; --border:#d1d5db; --accent:#2563eb;
+}
+@media (prefers-color-scheme:dark) {
+  :root { --bg:#111827; --card:#1f2937; --text:#f9fafb; --muted:#9ca3af; --border:#374151; --accent:#60a5fa; }
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+main{max-width:900px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:0 0 14px}
+.toolbar,.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+button,input,select{font:inherit}
+button,select,input{min-height:44px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);padding:9px 12px}
+button{cursor:pointer}
+button.active{border-color:var(--accent);outline:2px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+input{flex:1;min-width:200px}
+select{flex:1;min-width:180px}
+.meta-row{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:8px 0 12px;color:var(--muted);font-size:.9rem}
+.list{display:grid;gap:8px}
+.movie{display:grid;grid-template-columns:48px 1fr 48px;gap:8px;align-items:center;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
+.movie-title{font-size:1rem}
+.movie-title.seen{text-decoration:line-through;opacity:.65}
+.movie-meta{margin-top:4px;font-size:.8rem;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+.badge{border:1px solid var(--border);border-radius:999px;padding:2px 7px}
+.icon-btn{padding:0;font-size:1.25rem}
+.empty{padding:28px 0;text-align:center;color:var(--muted)}
+.footer{margin-top:16px;font-size:.8rem;color:var(--muted)}
+@media(max-width:520px){main{padding:12px} .movie{grid-template-columns:44px 1fr 44px;padding:8px}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Min IMDb Top 250</h1>
+  <div class="toolbar">
+    <button data-tab="priority">Se först <span id="count-priority"></span></button>
+    <button data-tab="unseen" class="active">Osedda <span id="count-unseen"></span></button>
+    <button data-tab="seen">Sedda <span id="count-seen"></span></button>
+    <button data-tab="all">Alla <span id="count-all"></span></button>
+  </div>
+  <div class="filters">
+    <input id="search" type="search" placeholder="Sök film…">
+    <select id="genre"><option value="all">Alla genrer</option></select>
+  </div>
+  <div class="meta-row">
+    <span id="result-count"></span>
+    <button id="reset-filters" type="button">Nollställ filter</button>
+  </div>
+  <div id="list" class="list"></div>
+  <div id="empty" class="empty" hidden>Inga filmer matchar filtret.</div>
+  <div class="footer">★ = se först · ✓ = sedd. Dina markeringar sparas lokalt i webbläsaren på den här enheten.</div>
+</main>
+<script>
+const RAW = `1|Drama|The Shawshank Redemption (1994)
+2|Crime|The Godfather (1972)
+3|Action / Adventure|The Dark Knight (2008)
+4|Crime|The Godfather Part II (1974)
+5|Fantasy|The Lord of the Rings: The Return of the King (2003)
+6|Drama|12 Angry Men (1957)
+7|War|Schindler's List (1993)
+8|Fantasy|The Lord of the Rings: The Fellowship of the Ring (2001)
+9|Crime|Pulp Fiction (1994)
+10|Fantasy|The Lord of the Rings: The Two Towers (2002)
+11|Western|The Good, the Bad and the Ugly (1966)
+12|Drama|Forrest Gump (1994)
+13|Drama|Fight Club (1999)
+14|Science Fiction|Inception (2010)
+15|Action / Adventure|The Empire Strikes Back (1980)
+16|Science Fiction|The Matrix (1999)
+17|Science Fiction|Interstellar (2014)
+18|Crime|Goodfellas (1990)
+19|Drama|One Flew Over the Cuckoo's Nest (1975)
+20|Crime|Se7en (1995)
+21|Romance|It's a Wonderful Life (1946)
+22|Thriller / Mystery|The Silence of the Lambs (1991)
+23|War|Saving Private Ryan (1998)
+24|Action / Adventure|Seven Samurai (1954)
+25|Drama|The Green Mile (1999)
+26|Crime|City of God (2002)
+27|Drama|Life Is Beautiful (1997)
+28|Science Fiction|Terminator 2: Judgment Day (1991)
+29|Science Fiction|Back to the Future (1985)
+30|Action / Adventure|Star Wars (1977)
+31|Action / Adventure|Kill Bill: The Whole Bloody Affair (2006)
+32|Fantasy|Spirited Away (2001)
+33|Action / Adventure|Gladiator (2000)
+34|War|The Pianist (2002)
+35|Drama|Parasite (2019)
+36|War|Grave of the Fireflies (1988)
+37|Drama|Harakiri (1962)
+38|Horror|Psycho (1960)
+39|Animation|The Lion King (1994)
+40|Crime|The Departed (2006)
+41|Drama|Whiplash (2014)
+42|Thriller / Mystery|The Prestige (2006)
+43|Drama|American History X (1998)
+44|Action / Adventure|Spider-Man: Across the Spider-Verse (2023)
+45|Crime|Léon: The Professional (1994)
+46|Drama|Cinema Paradiso (1988)
+47|Romance|Casablanca (1942)
+48|Drama|The Intouchables (2011)
+49|Crime|The Usual Suspects (1995)
+50|Western|Django Unchained (2012)
+51|Science Fiction|Alien (1979)
+52|Thriller / Mystery|Rear Window (1954)
+53|Comedy|Modern Times (1936)
+54|Western|Once Upon a Time in the West (1968)
+55|Comedy|City Lights (1931)
+56|Animation|WALL-E (2008)
+57|War|Apocalypse Now (1979)
+58|Action / Adventure|The Odyssey (2026)
+59|Crime|Memento (2000)
+60|Action / Adventure|Avengers: Infinity War (2018)
+61|Science Fiction|Dune: Part Two (2024)
+62|Action / Adventure|Raiders of the Lost Ark (1981)
+63|Action / Adventure|Spider-Man: Into the Spider-Verse (2018)
+64|Drama|The Lives of Others (2006)
+65|Drama|Sunset Boulevard (1950)
+66|Thriller / Mystery|Witness for the Prosecution (1957)
+67|War|Paths of Glory (1957)
+68|Horror|The Shining (1980)
+69|War|Inglourious Basterds (2009)
+70|Comedy|The Great Dictator (1940)
+71|Science Fiction|Aliens (1986)
+72|Drama|12th Fail (2023)
+73|Crime|High and Low (1963)
+74|Action / Adventure|Avengers: Endgame (2019)
+75|Drama|Good Will Hunting (1997)
+76|Animation|Coco (2017)
+77|Animation|Toy Story (1995)
+78|Action / Adventure|The Dark Knight Rises (2012)
+79|Musical / Music|Amadeus (1984)
+80|Romance|Your Name (2016)
+81|Drama|3 Idiots (2009)
+82|War|Das Boot (1981)
+83|War|Braveheart (1995)
+84|Fantasy|Princess Mononoke (1997)
+85|Crime|Oldboy (2003)
+86|Comedy|Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb (1964)
+87|Drama|American Beauty (1999)
+88|Drama|Capernaum (2018)
+89|Musical / Music|Singin' in the Rain (1952)
+90|Crime|Once Upon a Time in America (1984)
+91|Drama|Joker (2019)
+92|Animation|Toy Story 3 (2010)
+93|Action / Adventure|Return of the Jedi (1983)
+94|War|Come and See (1985)
+95|Drama|Requiem for a Dream (2000)
+96|Drama|Ikiru (1952)
+97|Drama|Incendies (2010)
+98|Drama|The Hunt (2012)
+99|Animation|Attack on Titan: The Last Attack (2024)
+100|Romance|Eternal Sunshine of the Spotless Mind (2004)
+101|Comedy|The Apartment (1960)
+102|War|Lawrence of Arabia (1962)
+103|Crime|Heat (1995)
+104|Crime|Scarface (1983)
+105|Crime|Reservoir Dogs (1992)
+106|Science Fiction|2001: A Space Odyssey (1968)
+107|Animation|Up (2009)
+108|Crime|Double Indemnity (1944)
+109|Drama|Like Stars on Earth (2007)
+110|Thriller / Mystery|North by Northwest (1959)
+111|War|Full Metal Jacket (1987)
+112|Drama|I Swear (2025)
+113|Drama|A Separation (2011)
+114|Crime|M (1931)
+115|Action / Adventure|Die Hard (1988)
+116|Comedy|Amélie (2001)
+117|Thriller / Mystery|Vertigo (1958)
+118|Drama|Citizen Kane (1941)
+119|Drama|To Kill a Mockingbird (1962)
+120|Action / Adventure|Indiana Jones and the Last Crusade (1989)
+121|Crime|The Sting (1973)
+122|Science Fiction|A Clockwork Orange (1971)
+123|Science Fiction|Metropolis (1927)
+124|War|1917 (2019)
+125|Drama|The Wolf of Wall Street (2013)
+126|Crime|Snatch (2000)
+127|Comedy|The Truman Show (1998)
+128|Drama|Woman in the Dunes (1964)
+129|War|Downfall (2004)
+130|Thriller / Mystery|Shutter Island (2010)
+131|Crime|L.A. Confidential (1997)
+132|Drama|Dangal (2016)
+133|Drama|Green Book (2018)
+134|Drama|Bicycle Thieves (1948)
+135|War|Judgment at Nuremberg (1961)
+136|Science Fiction|Jurassic Park (1993)
+137|Action / Adventure|Batman Begins (2005)
+138|Historical / Biographical|Oppenheimer (2023)
+139|Western|For a Few Dollars More (1965)
+140|Musical / Music|Hamilton (2020)
+141|Drama|There Will Be Blood (2007)
+142|Comedy|Some Like It Hot (1959)
+143|Drama|Taxi Driver (1976)
+144|Drama|The Father (2020)
+145|Comedy|The Kid (1921)
+146|Drama|All About Eve (1950)
+147|Thriller / Mystery|The Sixth Sense (1999)
+148|War|Ran (1985)
+149|Crime|Casino (1995)
+150|Science Fiction|The Thing (1982)
+151|Crime|No Country for Old Men (2007)
+152|Thriller / Mystery|Prisoners (2013)
+153|Action / Adventure|Top Gun: Maverick (2022)
+154|Action / Adventure|Kill Bill: Vol. 1 (2003)
+155|Fantasy|Pan's Labyrinth (2006)
+156|Western|Unforgiven (1992)
+157|Drama|A Beautiful Mind (2001)
+158|Science Fiction|Project Hail Mary (2026)
+159|Fantasy|Howl's Moving Castle (2004)
+160|Western|The Treasure of the Sierra Madre (1948)
+161|Action / Adventure|Demon Slayer: Infinity Castle (2025)
+162|Animation|Finding Nemo (2003)
+163|Animation|Klaus (2019)
+164|Action / Adventure|Yojimbo (1961)
+165|Drama|The Elephant Man (1980)
+166|War|The Great Escape (1963)
+167|Comedy|Monty Python and the Holy Grail (1975)
+168|Thriller / Mystery|Dial M for Murder (1954)
+169|Crime|The Secret in Their Eyes (2009)
+170|Romance|Gone with the Wind (1939)
+171|Crime|Lock, Stock and Two Smoking Barrels (1998)
+172|Crime|Chinatown (1974)
+173|Crime|Catch Me If You Can (2002)
+174|Science Fiction|V for Vendetta (2005)
+175|Drama|The Best of Youth (2003)
+176|Drama|Dead Poets Society (1989)
+177|Animation|Inside Out (2015)
+178|Drama|Trainspotting (1996)
+179|Drama|Three Billboards Outside Ebbing, Missouri (2017)
+180|Fantasy|Harry Potter and the Deathly Hallows: Part 2 (2011)
+181|War|The Bridge on the River Kwai (1957)
+182|Drama|Rashomon (1950)
+183|Drama|Barry Lyndon (1975)
+184|Animation|The Wild Robot (2024)
+185|War|Ben-Hur (1959)
+186|Drama|Warrior (2011)
+187|War|Hacksaw Ridge (2016)
+188|Crime|Fargo (1996)
+189|Action / Adventure|Mad Max: Fury Road (2015)
+190|Animation|Ratatouille (2007)
+191|Drama|Million Dollar Baby (2004)
+192|Drama|Children of Heaven (1997)
+193|Animation|My Neighbor Totoro (1988)
+194|Drama|Gran Torino (2008)
+195|Drama|Raging Bull (1980)
+196|Drama|12 Years a Slave (2013)
+197|Animation|How to Train Your Dragon (2010)
+198|Crime|Memories of Murder (2003)
+199|Comedy|The Grand Budapest Hotel (2014)
+200|Romance|Before Sunrise (1995)
+201|Science Fiction|Blade Runner (1982)
+202|Animation|Monsters, Inc. (2001)
+203|Crime|Gone Girl (2014)
+204|Historical / Biographical|Ford v Ferrari (2019)
+205|Horror|Jaws (1975)
+206|Drama|In the Name of the Father (1993)
+207|Action / Adventure|Spider-Man: No Way Home (2021)
+208|Comedy|Wild Tales (2014)
+209|Action / Adventure|Chainsaw Man – The Movie: Reze Arc (2025)
+210|Comedy|The Gold Rush (1925)
+211|Comedy|Sherlock Jr. (1924)
+212|Drama|Mary and Max (2009)
+213|Drama|A Silent Voice (2016)
+214|Thriller / Mystery|The Wages of Fear (1953)
+215|War|The Deer Hunter (1978)
+216|Action / Adventure|Logan (2017)
+217|Drama|Rocky (1976)
+218|Fantasy|Pirates of the Caribbean: The Curse of the Black Pearl (2003)
+219|Comedy|The General (1926)
+220|Drama|Mr. Smith Goes to Washington (1939)
+221|Drama|Tokyo Story (1953)
+222|Drama|La Haine (1995)
+223|Drama|Spotlight (2015)
+224|Crime|Maharaja (2024)
+225|Drama|Jai Bhim (2021)
+226|Musical / Music|The Sound of Music (1965)
+227|Science Fiction|The Terminator (1984)
+228|Drama|Wild Strawberries (1957)
+229|Drama|On the Waterfront (1954)
+230|Drama|The Best Years of Our Lives (1946)
+231|Crime|The Third Man (1949)
+232|Comedy|The Big Lebowski (1998)
+233|Animation|The Incredibles (2004)
+234|Romance|Before Sunset (2004)
+235|Drama|Hachi: A Dog's Tale (2009)
+236|Comedy|Hababam Sinifi: Sinifta Kaldi (1975)
+237|Drama|Room (2015)
+238|Horror|The Exorcist (1973)
+239|War|Hotel Rwanda (2004)
+240|Fantasy|The Seventh Seal (1957)
+241|War|Platoon (1986)
+242|Animation|The Iron Giant (1999)
+243|Historical / Biographical|Rush (2013)
+244|Drama|Stand by Me (1986)
+245|Fantasy|The Wizard of Oz (1939)
+246|War|The Battle of Algiers (1966)
+247|Drama|My Father and My Son (2005)
+248|Drama|The Passion of Joan of Arc (1928)
+249|Drama|Autumn Sonata (1978)
+250|Crime|The Handmaiden (2016)`;
+const STORAGE_KEY = 'imdb250-watchlist-v1';
+
+let movies = RAW.trim().split('\n').map(line => {
+  const [rank, genre, ...rest] = line.split('|');
+  return { rank:Number(rank), genre, title:rest.join('|'), priority:false, seen:false };
+});
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    movies.forEach(m => {
+      const s = saved[m.rank];
+      if (s) { m.priority = !!s.priority; m.seen = !!s.seen; }
+    });
+  } catch(e) {}
+}
+function saveState() {
+  try {
+    const out = {};
+    movies.forEach(m => out[m.rank] = {priority:m.priority, seen:m.seen});
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
+  } catch(e) {}
+}
+
+loadState();
+
+let tab = 'unseen';
+const list = document.getElementById('list');
+const empty = document.getElementById('empty');
+const search = document.getElementById('search');
+const genre = document.getElementById('genre');
+const resultCount = document.getElementById('result-count');
+
+[...new Set(movies.map(m=>m.genre))].sort().forEach(g => {
+  const o=document.createElement('option'); o.value=g; o.textContent=g; genre.appendChild(o);
+});
+
+function visible() {
+  const q=search.value.trim().toLowerCase();
+  return movies.filter(m => {
+    if(tab==='priority' && (!m.priority || m.seen)) return false;
+    if(tab==='unseen' && m.seen) return false;
+    if(tab==='seen' && !m.seen) return false;
+    if(genre.value!=='all' && m.genre!==genre.value) return false;
+    if(q && !m.title.toLowerCase().includes(q)) return false;
+    return true;
+  }).sort((a,b)=>a.rank-b.rank);
+}
+
+function render() {
+  document.getElementById('count-priority').textContent='('+movies.filter(m=>m.priority&&!m.seen).length+')';
+  document.getElementById('count-unseen').textContent='('+movies.filter(m=>!m.seen).length+')';
+  document.getElementById('count-seen').textContent='('+movies.filter(m=>m.seen).length+')';
+  document.getElementById('count-all').textContent='('+movies.length+')';
+
+  document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+
+  const items=visible();
+  resultCount.textContent=items.length+(items.length===1?' film':' filmer');
+  list.innerHTML='';
+  empty.hidden=items.length!==0;
+
+  for(const m of items){
+    const row=document.createElement('div'); row.className='movie';
+
+    const star=document.createElement('button');
+    star.className='icon-btn'; star.type='button';
+    star.textContent=m.priority?'★':'☆';
+    star.title=m.priority?'Ta bort från Se först':'Markera som Se först';
+    star.addEventListener('click',()=>{m.priority=!m.priority;saveState();render();});
+
+    const info=document.createElement('div');
+    const title=document.createElement('div');
+    title.className='movie-title'+(m.seen?' seen':'');
+    title.textContent=m.title;
+    const meta=document.createElement('div'); meta.className='movie-meta';
+    const rank=document.createElement('span'); rank.textContent='IMDb #'+m.rank;
+    const badge=document.createElement('span'); badge.className='badge'; badge.textContent=m.genre;
+    meta.append(rank,badge); info.append(title,meta);
+
+    const seen=document.createElement('button');
+    seen.className='icon-btn'; seen.type='button';
+    seen.textContent=m.seen?'✓':'○';
+    seen.title=m.seen?'Markera som osedd':'Markera som sedd';
+    seen.addEventListener('click',()=>{m.seen=!m.seen;saveState();render();});
+
+    row.append(star,info,seen); list.appendChild(row);
+  }
+}
+
+document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{tab=b.dataset.tab;render();}));
+search.addEventListener('input',render);
+genre.addEventListener('change',render);
+document.getElementById('reset-filters').addEventListener('click',()=>{
+  tab='unseen'; search.value=''; genre.value='all'; render();
+});
+render();
+</script>
+</body>
+</html>
